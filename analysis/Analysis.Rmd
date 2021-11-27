@@ -1,0 +1,201 @@
+---
+title: "Analisi Pinguini"
+author: "Emanuel Michele Soda"
+date: "11/27/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 11 , fig.height =10)
+library(tidyverse)
+library(palmerpenguins)
+library(tidymodels)
+library(plotly)
+library(factoextra)
+library(sjPlot)
+theme_set(theme_light())
+```
+
+# Exploratory data aalysis
+
+## Dimension of the tibble  
+```{r}
+penguins_df <- penguins %>% drop_na() 
+penguins_df %>%  dim()
+```
+
+## Number of penguin by species 
+
+```{r}
+penguins_df %>%  count(species)
+```
+
+## Number of penguin by sex 
+As can be seen there are some na values in sex
+```{r}
+penguins_df %>%  count(sex)
+```
+
+# Plot in a 3D space using the predictor
+
+As can be seen using this 3 predictor two big cluster are generated, in those
+two cluster are divided by __body_mass_g__. It can be concluded that a model
+which predict the body mass will have very good performance
+```{r}
+plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
+        z = ~flipper_length_mm, size = ~body_mass_g,
+        marker = list(symbol = 'circle', 
+                      sizemode = 'diameter'), 
+        sizes = c(1, 20),
+        color = ~sex, colors = c('#965F8A','#4AC6B7'))
+```
+
+
+Also for the species  the model will be very good 
+```{r}
+plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
+        z = ~flipper_length_mm, size = ~body_mass_g,
+        marker = list(symbol = 'circle', 
+                      sizemode = 'diameter'), 
+        sizes = c(1, 20),
+        color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
+penguins_df %>% 
+  
+ggplot(., aes(x = bill_length_mm, y = bill_depth_mm, 
+              col = sex, shape = island, size = body_mass_g)) +
+  geom_point(alpha = 0.7)  +
+  scale_color_manual(values = c('#965F8A','#4AC6B7')) +
+  theme(legend.position = "top") +
+  facet_wrap("species")  
+```
+
+
+
+# Creation of the model to predict the sex
+The __penguin_train__ has only 249 observation those are not very a lot
+so we can using bootstrapping to improve di accuracy 
+```{r}
+
+penguins_df <- penguins_df %>% select(- c(year, island, species))
+# Creation of a split stratified by sex in order to have the same number of observation in each group 
+penguin_split <- initial_split(penguins_df, strata = sex)
+
+penguin_train <- training(penguin_split)
+penguin_test <- testing(penguin_split)
+```
+
+# Creating the model 
+We will use two very simple model __logistic regressioin__ and
+__random forest__
+```{r}
+glm_spec <- logistic_reg() %>%
+  set_engine("glm")
+
+rf_spec <- rand_forest() %>%
+  set_mode("classification") %>%
+  set_engine("ranger")
+
+# In order to fit the model we need to  create a workflow so
+
+penguin_wf <- workflow() %>%
+  add_formula(sex ~ .)
+```
+
+# Fit the model
+
+## Creting the resampling dataset
+```{r}
+folds <- vfold_cv(penguin_train, v = 10)
+folds
+```
+
+## Fitting the model
+```{r}
+# Logistic model
+pengun_logistic <-
+  penguin_wf %>% 
+  add_model(glm_spec) %>%
+  fit_resamples(
+    resamples = folds,
+    control = control_resamples(save_pred = T)
+  )
+
+# Random Forest model 
+pengun_random_forest <-
+  penguin_wf %>% 
+  add_model(rf_spec) %>%
+  fit_resamples(
+    resamples = folds,
+    control = control_resamples(save_pred = T)
+  )
+```
+
+# Metrics 
+```{r}
+collect_metrics(pengun_logistic)
+
+collect_metrics(pengun_random_forest)
+```
+
+
+
+```{r}
+pengun_logistic %>%
+  collect_predictions() %>%
+  group_by(id) %>%
+  roc_curve(sex, .pred_female) %>%
+  ggplot(aes(1 - specificity, sensitivity, color = id)) +
+  geom_abline(lty = 2, color = "gray60") +
+  geom_path(show.legend = FALSE) +
+  scale_color_brewer(palette = "Set3") +
+  coord_equal()
+```
+
+
+We will now use the for the first time the testing set which is very important 
+to see the performance of themodel on new data
+```{r}
+penguin_final <- penguin_wf %>%
+  add_model(glm_spec) %>%
+  last_fit(penguin_split)
+
+collect_metrics(penguin_final)
+
+
+collect_predictions(penguin_final) %>%
+  conf_mat(sex, .pred_class)
+```
+
+```{r}
+penguin_final$.workflow[[1]] %>%
+  tidy(exponentiate = TRUE) 
+```
+
+```{r}
+m1 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
+
+plot_model(m1, sort.est = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
