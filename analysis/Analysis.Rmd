@@ -3,8 +3,11 @@ title: "Analisi Pinguini"
 author: "Emanuel Michele Soda"
 date: "11/27/2021"
 output:
+  html_document: 
+    fig_width: 11
+    fig_height: 10
+    df_print: tibble
   pdf_document: default
-  html_document: default
 editor_options:
   chunk_output_type: console
 ---
@@ -17,34 +20,64 @@ library(tidymodels)
 library(plotly)
 library(factoextra)
 library(sjPlot)
+library(ggfortify)
 theme_set(theme_light())
 ```
 
 # Exploratory data aalysis
-
-## Dimension of the tibble  
+## Read data 
+First of all we will read the data. The data contains some NA values. So, we 
+will drop those NA values. After the drop ov the NA vallues the dimension of 
+the tibble is $333$x$8$. 
 ```{r}
 penguins_df <- penguins %>% drop_na() 
 penguins_df %>%  dim()
 ```
 
 ## Number of penguin by species 
+We have  three species of penguins:
 
+* __Adelie__
+* __Chinstrap__
+* __Gentoo__
 ```{r}
 penguins_df %>%  count(species)
 ```
 
 ## Number of penguin by sex 
-As can be seen there are some na values in sex
+As can be seen the number of male and female in the dataset is almost the same.
 ```{r}
 penguins_df %>%  count(sex)
 ```
 
-# Plot in a 3D space using the predictor
+## Plot variance feature
+```{r}
+penguins_df  %>% 
+  select(-c(island, year)) %>% 
+  pivot_longer(bill_length_mm:body_mass_g) %>% 
+  mutate(name = factor(name)) %>% 
+  
+  ggplot(., aes(sex, value, fill = sex, color = species)) +
+  geom_violin(width=0.7, color = "black", alpha = 0.8) +
+  geom_jitter(width=0.2, aplha = 0.75, aes(size = value)) +
+  geom_boxplot(width= 0.09, fill = "white", color = "black", alpha = 0.8) +
+  scale_y_log10() +
+  scale_fill_manual(values = c('#965F8A','#4AC6B7')) + 
+  scale_color_manual(values = c('#965F8A','#4AC6B7', "#C61951")) +
+  facet_wrap("name", scales = "free") +
+  scale_size(range = c(1, 3))
+```
 
-As can be seen using this 3 predictor two big cluster are generated, in those
-two cluster are divided by __body_mass_g__. It can be concluded that a model
-which predict the body mass will have very good performance
+
+## Plot in a 3D space using the predictor
+Let's make a scatterplot using three predictor which are:
+
+* __bill_length_mm__
+* __bill_depth_mm__
+* __flipper_length_mm__
+
+The size of the dot will be scaled by __body_mass_g__ and we will color the 
+dot by sex
 ```{r}
 plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
         z = ~flipper_length_mm, size = ~body_mass_g,
@@ -54,8 +87,7 @@ plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm,
         color = ~sex, colors = c('#965F8A','#4AC6B7'))
 ```
 
-
-Also for the species  the model will be very good 
+Let's do the same for the __species__
 ```{r}
 plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
         z = ~flipper_length_mm, size = ~body_mass_g,
@@ -73,13 +105,40 @@ ggplot(., aes(x = bill_length_mm, y = bill_depth_mm,
   facet_wrap("species")  
 ```
 
+## PCA Plot
 
+```{r}
+pca_res <- prcomp(penguins_df %>% select(-c(species, island, year, sex)), 
+                  scale. = TRUE) 
+pca_res <- 
+  pca_res$x %>% data.frame() %>% tibble() %>% 
+  mutate(sex = penguins_df$sex, species = penguins_df$species) 
+```
+
+## PCA plot by sex
+```{r}
+plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
+        color = ~sex, colors = c('#965F8A','#4AC6B7'))
+```
+
+## PCA plot by species
+```{r}
+plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
+        color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
+```
 
 # Creation of the model to predict the sex
-The __penguin_train__ has only 249 observation those are not very a lot
-so we can using bootstrapping to improve di accuracy 
-```{r}
+As we have seen from the plot the data cluster very well according to the three 
+species, this because of course the three species are based on  those measurements.
+For this reason we will try to predict the sex based on those measurements. 
 
+First of all we have to create the training dataset that we will call
+__penguin_train__. Unfortunately the entire dataset  has only 333 sample. Those
+are not a lot for those reason order to improve the performance we will use 
+the resampling.
+
+The dimension of the training is 249 and for the test we have 84.
+```{r}
 penguins_df <- penguins_df %>% select(- c(year, island, species))
 # Creation of a split stratified by sex in order to have the same number of observation in each group 
 penguin_split <- initial_split(penguins_df, strata = sex)
@@ -89,7 +148,7 @@ penguin_test <- testing(penguin_split)
 ```
 
 # Creating the model 
-We will use two very simple model __logistic regressioin__ and
+We will use two very simple model __logistic regression__ and
 __random forest__
 ```{r}
 glm_spec <- logistic_reg() %>%
