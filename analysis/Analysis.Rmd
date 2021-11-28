@@ -168,7 +168,7 @@ penguin_wf <- workflow() %>%
 
 ## Creting the resampling dataset
 ```{r}
-folds <- vfold_cv(penguin_train, v = 10)
+folds <- vfold_cv(data = penguin_train, v = 10,repeats = 5, strata = sex)
 folds
 ```
 
@@ -180,8 +180,7 @@ pengun_logistic <-
   add_model(glm_spec) %>%
   fit_resamples(
     resamples = folds,
-    control = control_resamples(save_pred = T)
-  )
+    control = control_resamples(save_pred = T))
 
 # Random Forest model 
 pengun_random_forest <-
@@ -189,19 +188,24 @@ pengun_random_forest <-
   add_model(rf_spec) %>%
   fit_resamples(
     resamples = folds,
-    control = control_resamples(save_pred = T)
-  )
+    control = control_resamples(save_pred = T))
 ```
 
 # Metrics 
+## Accuracy and AUC 
+As can be seen even if the __Random Forest_ is more complex  model as can 
+be seen the __Logistic Regression__ have similar performance. 
+For this reason we will use the __Logistic Regression__ because is a lot simpler
+to interpret.
+
 ```{r}
 collect_metrics(pengun_logistic)
 
 collect_metrics(pengun_random_forest)
 ```
 
-
-
+# ROC curve
+As can be see the ROC Curve for each resample is quite good 
 ```{r}
 pengun_logistic %>%
   collect_predictions() %>%
@@ -209,14 +213,15 @@ pengun_logistic %>%
   roc_curve(sex, .pred_female) %>%
   ggplot(aes(1 - specificity, sensitivity, color = id)) +
   geom_abline(lty = 2, color = "gray60") +
-  geom_path(show.legend = FALSE) +
+  geom_path() +
+  theme(legend.position = "bottom") +
   scale_color_brewer(palette = "Set3") +
   coord_equal()
 ```
 
+## Confusion Matrix
 
-We will now use the for the first time the testing set which is very important 
-to see the performance of themodel on new data
+And also the Confusion matrix is quite good
 ```{r}
 penguin_final <- penguin_wf %>%
   add_model(glm_spec) %>%
@@ -229,11 +234,21 @@ collect_predictions(penguin_final) %>%
   conf_mat(sex, .pred_class)
 ```
 
+
+# Interpretation 
+The use of a  __logistic regression__ is good because is a very simple  and so
+very interpretable model. In particular there is a property for which the 
+if the exponentiate parameter of the model corresponds to the odds ration 
 ```{r}
 penguin_final$.workflow[[1]] %>%
-  tidy(exponentiate = TRUE) 
+  tidy(exponentiate = TRUE)  %>% 
+  mutate(p.value = round(p.value, 10)) %>% 
+ mutate(estimate = round(estimate, 5))
 ```
 
+For this reason  we can say that for each $1$ mm increment in the 
+__bill_depth_mm__the odds of beeing male vs beeing female increase of $6.16$ 
+time.
 ```{r}
 m1 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 
