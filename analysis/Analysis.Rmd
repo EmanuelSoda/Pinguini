@@ -278,7 +278,6 @@ m1 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 
 plot_model(m1, sort.est = TRUE)
 
-
 ```
 
 
@@ -288,16 +287,49 @@ ggstatsplot::ggcoefstats(m1, ggtheme = theme_light())
 ```
 
 
+As can be seen the __flipper_length_mm__ is not statistically significant. We 
+can remove this predictor and train again the model. 
 
 
 
+```{r}
+penguin_train <- penguin_train %>%  select(- flipper_length_mm)
+m2 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
+summary(m2)
+```
+
+```{r}
+ggstatsplot::ggcoefstats(m2, ggtheme = theme_light())
+```
 
 
 
+As can be seen from the pie chart almost 90.5% of the prediction were good 
+```{r}
+class_label_test <-  penguin_test %>% pull(sex)
+penguin_test <- penguin_test %>% select(-c(flipper_length_mm, sex))
+predicted_porb <-
+  m2 %>% 
+  predict(penguin_test, type = "response") 
+predicted_sex <-
+ifelse(test = predicted_porb > 0.5, yes = "male", "female")
 
-
-
-
+penguin_test %>% 
+  mutate(sex_true = class_label_test,
+         sex_predicted = predicted_sex) %>% 
+  mutate(good = ifelse(test = sex_true != sex_predicted, 
+                       "Good", "Bad")) %>% 
+  count(good) %>% 
+  
+  ggplot(., aes(x="", y=n, fill=good)) +
+  geom_bar(width = 1, stat = "identity", col = "white") +
+  geom_label(aes(label = paste0(round(n/sum(n)*100, 1), "%")),
+            position = position_stack(vjust = 0.5)) +
+  coord_polar(theta = "y") +  
+  theme_void() +
+  theme(axis.text.x=element_blank()) + 
+  scale_fill_manual(values = c('#965F8A','#4AC6B7'))  
+```
 
 
 
