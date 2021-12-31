@@ -13,7 +13,8 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.width = 11 , fig.height =10)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 12, 
+                      fig.height = 8, warning=FALSE, set.seed (20211127))
 library(tidyverse)
 library(palmerpenguins)
 library(tidymodels)
@@ -21,15 +22,15 @@ library(plotly)
 library(factoextra)
 library(sjPlot)
 library(ggfortify)
-theme_set(theme_light())
+theme_set(theme_light() + theme(legend.position = "bottom"))
 ```
 
 # Exploratory data aalysis
 ## Read data 
 First of all we will read the data. The data contains some NA values. So, we 
-will drop those NA values. After the drop ov the NA vallues the dimension of 
-the tibble is $333$x$8$. 
-```{r}
+will drop those NA values. After the drop of the NA values the dimension of 
+the tibble is $333 \times 8$. 
+```{r warning=FALSE}
 penguins_df <- penguins %>% drop_na() 
 penguins_df %>%  dim()
 ```
@@ -40,12 +41,15 @@ We have  three species of penguins:
 * __Adelie__
 * __Chinstrap__
 * __Gentoo__
+
+As can be seen for the species we have unbalanced classes
 ```{r}
 penguins_df %>%  count(species)
 ```
 
 ## Number of penguin by sex 
 As can be seen the number of male and female in the dataset is almost the same.
+This is good because we do not have unbalanced classes.
 ```{r}
 penguins_df %>%  count(sex)
 ```
@@ -55,60 +59,60 @@ penguins_df %>%  count(sex)
 my_comparisons <- list(c("female", "male"))
 penguins_df  %>% 
   select(-c(island, year)) %>%  
-  pivot_longer(bill_length_mm:body_mass_g) %>% 
-  mutate(name = factor(name)) %>% 
+  pivot_longer(bill_length_mm:body_mass_g) %>%
+  mutate(across(where(is_character), as_factor)) %>% 
   
   ggplot(., aes(sex, value, fill = sex, color = species)) +
-  geom_violin(width=0.7, color = "black", alpha = 0.8) +
-  geom_jitter(width=0.2, aplha = 0.75, aes(size = value)) +
-  geom_boxplot(width= 0.09, fill = "white", color = "black", alpha = 0.8) +
+  geom_violin(width=0.7, color = "black", alpha = 0.3) +
+  geom_jitter(width=0.25, aplha = 0.8) +
+  geom_boxplot(width= 0.09, fill = "white", color = "black", alpha = 0.3) +
   scale_y_log10() +
-  scale_fill_manual(values = c('#965F8A','#4AC6B7')) + 
+  scale_fill_manual(values = c('#d8b365','#7fbf7b')) + 
   scale_color_manual(values = c('#965F8A','#4AC6B7', "#C61951")) +
+  labs(col = "Species", fill = "Sex", size = "Size", x = NULL, y = NULL) +
   ggpubr::stat_compare_means(comparisons = my_comparisons, 
                              label = "p.signif") +
   facet_wrap("name", scales = "free") +
-  scale_size(range = c(1, 3))
+  scale_size(range = c(1, 3)) +
+  theme(legend.position="right") 
 
 
 penguins_df  %>% 
   select(-c(island, year)) %>%  
   pivot_longer(bill_length_mm:body_mass_g) %>% 
-  mutate(name = factor(name)) %>% 
+  mutate(across(where(is_character), as_factor)) %>% 
+  
   ggplot(., aes(value, fill = sex)) +
-  geom_density(alpha= 0.8) +
-  scale_fill_manual(values = c('#965F8A','#4AC6B7'))  +
-  facet_wrap("name", scales = "free") +
-  theme(legend.position="bottom") 
+  geom_density(alpha= 0.3) +
+  labs(fill = "Sex", x = NULL) +
+  scale_fill_manual(values = c('#d8b365','#7fbf7b'))  +
+  facet_wrap("name", scales = "free") 
 ```
 
 ```{r}
-
 ggstatsplot::ggcorrmat(
   data     = penguins_df  %>% select(-c(island, year, species, sex)),
   colors   = c("#B2182B", "white", "#4D4D4D"),
   title    = "Correlation among predictors",
   matrix.type  = "lower")
-
 ```
 
-
 ## Plot in a 3D space using the predictor
-Let's make a scatterplot using three predictor which are:
+Let's make a scatterplot using three predictors which are:
 
 * __bill_length_mm__
 * __bill_depth_mm__
 * __flipper_length_mm__
 
 The size of the dot will be scaled by __body_mass_g__ and we will color the 
-dot by sex
+dots by sex
 ```{r}
 plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
         z = ~flipper_length_mm, size = ~body_mass_g,
         marker = list(symbol = 'circle', 
                       sizemode = 'diameter'), 
         sizes = c(1, 20),
-        color = ~sex, colors = c('#965F8A','#4AC6B7'))
+        color = ~sex, colors = c('#d8b365','#7fbf7b'))
 ```
 
 Let's do the same for the __species__
@@ -119,8 +123,8 @@ plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm,
                       sizemode = 'diameter'), 
         sizes = c(1, 20),
         color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
+
 penguins_df %>% 
-  
 ggplot(., aes(x = bill_length_mm, y = bill_depth_mm, 
               col = sex, shape = island, size = body_mass_g)) +
   geom_point(alpha = 0.7)  +
@@ -134,6 +138,38 @@ ggplot(., aes(x = bill_length_mm, y = bill_depth_mm,
 ```{r}
 pca_res <- prcomp(penguins_df %>% select(-c(species, island, year, sex)), 
                   scale. = TRUE) 
+
+
+
+fviz_pca_var(pca_res,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+## Percentage variance Expressed by PCs
+First of all we will have a look to the percentage of expressed variance by each 
+of the PC. As can be seen the cumulativepercentage of expressed variance by 
+the first two is about $80\%$.
+```{r}
+fviz_eig(pca_res, barcolor = "black", 
+         main = NULL, ylab = "Percentage explained variance") +
+   scale_y_continuous(labels = ~paste0(.x , '%'))
+
+get_eig(pca_res) %>% data.frame() %>% 
+  rownames_to_column("Dimensions") %>% 
+  tibble()  %>% 
+  mutate(across(where(is_character), as_factor)) %>% 
+  mutate(Dimensions = str_remove(string = Dimensions,pattern = "Dim.")) %>% 
+  ggplot(., aes(Dimensions, cumulative.variance.percent)) +
+  geom_bar(stat="identity", fill="steelblue", col = "black") +
+  geom_line(aes(group=1))  +
+  geom_point() +
+  scale_y_continuous(labels = ~paste0(.x , '%')) +
+  labs(y= "Cumulative percentage explained variance")
+
+
 pca_res <- 
   pca_res$x %>% data.frame() %>% tibble() %>% 
   mutate(sex = penguins_df$sex, species = penguins_df$species) 
@@ -142,7 +178,7 @@ pca_res <-
 ## PCA plot by sex
 ```{r}
 plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
-        color = ~sex, colors = c('#965F8A','#4AC6B7'))
+        color = ~sex, colors = c('#d8b365','#7fbf7b'))
 ```
 
 ## PCA plot by species
@@ -151,20 +187,25 @@ plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
         color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
 ```
 
+
+
+
+
 # Creation of the model to predict the sex
 As we have seen from the plot the data cluster very well according to the three 
-species, this because of course the three species are based on  those measurements.
+species, this because of course the three species are based on those measurements.
 For this reason we will try to predict the sex based on those measurements. 
 
 First of all we have to create the training dataset that we will call
-__penguin_train__. Unfortunately the entire dataset  has only 333 sample. Those
+__penguin_train__. Unfortunately the entire dataset has only 333 sample. Those
 are not a lot for those reason order to improve the performance we will use 
 the resampling.
 
 The dimension of the training is 249 and for the test we have 84.
 ```{r}
 penguins_df <- penguins_df %>% select(- c(year, island, species))
-# Creation of a split stratified by sex in order to have the same number of observation in each group 
+# Creation of a split stratified by sex in order to have the same number 
+# of observation in each group 
 penguin_split <- initial_split(penguins_df, strata = sex)
 
 penguin_train <- training(penguin_split)
@@ -172,8 +213,9 @@ penguin_test <- testing(penguin_split)
 ```
 
 # Creating the model 
-We will use two very simple model __logistic regression__ and
-__random forest__
+We will use two very simple model __logistic regression__ and a more complex
+but less interpretable model __random forest__
+
 ```{r}
 glm_spec <- logistic_reg() %>%
   set_engine("glm")
@@ -183,7 +225,8 @@ rf_spec <- rand_forest() %>%
   set_engine("ranger")
 
 # In order to fit the model we need to  create a workflow so
-
+# We will predict sex based on all the other predictor 
+# bill_length_mm bill_depth_mm flipper_length_mm body_mass_g
 penguin_wf <- workflow() %>%
   add_formula(sex ~ .)
 ```
@@ -192,12 +235,14 @@ penguin_wf <- workflow() %>%
 
 ## Creting the resampling dataset
 ```{r}
-folds <- vfold_cv(data = penguin_train, v = 10,repeats = 5, strata = sex)
+folds <- vfold_cv(data = penguin_train, v = 10, repeats = 10, strata = sex)
 folds
 ```
 
 ## Fitting the model
 ```{r}
+doParallel::registerDoParallel() 
+
 # Logistic model
 pengun_logistic <-
   penguin_wf %>% 
@@ -251,11 +296,9 @@ penguin_final <- penguin_wf %>%
   add_model(glm_spec) %>%
   last_fit(penguin_split)
 
-collect_metrics(penguin_final)
-
-
 collect_predictions(penguin_final) %>%
-  conf_mat(sex, .pred_class)
+  conf_mat(sex, .pred_class) %>% 
+  autoplot(type = "heatmap") 
 ```
 
 
@@ -267,17 +310,20 @@ if the exponentiate parameter of the model corresponds to the odds ration
 penguin_final$.workflow[[1]] %>%
   tidy(exponentiate = TRUE)  %>% 
   mutate(p.value = round(p.value, 10)) %>% 
- mutate(estimate = round(estimate, 5))
+  mutate(estimate = round(estimate, 5))
 ```
 
 For this reason  we can say that for each $1$ mm increment in the 
-__bill_depth_mm__the odds of beeing male vs beeing female increase of $6.16$ 
+__bill_depth_mm__the odds of beeing male vs beeing female increase of $7.23$ 
 time.
 ```{r}
 m1 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 
-plot_model(m1, sort.est = TRUE)
+summary(m1)
+```
 
+```{r}
+plot_model(m1, sort.est = TRUE,show.values = T)
 ```
 
 
@@ -287,21 +333,34 @@ ggstatsplot::ggcoefstats(m1, ggtheme = theme_light())
 ```
 
 
-As can be seen the __flipper_length_mm__ is not statistically significant. We 
-can remove this predictor and train again the model. 
+As can be seen the __flipper_length_mm__  and the __bill_length_mm_ are not
+statistically significant. We can remove those predictors and train again
+the model. 
 
 
 
 ```{r}
-penguin_train <- penguin_train %>%  select(- flipper_length_mm)
+penguin_train <- 
+  penguin_train %>%  
+  select(- c(flipper_length_mm, bill_length_mm))
+
 m2 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 summary(m2)
+```
+
+
+
+Looking at the final model we can say that for each $1$ mm increment in the 
+__bill_depth_mm__ the odds of beeing male vs beeing female increase of $7.45$ 
+time. While for each $1$ g increment in the __bill_depth_mm__ the odds of beeing 
+male vs beeing female increase of $1.01$ times. 
+```{r}
+plot_model(m2, sort.est = TRUE, show.values = T)
 ```
 
 ```{r}
 ggstatsplot::ggcoefstats(m2, ggtheme = theme_light())
 ```
-
 
 
 As can be seen from the pie chart almost 90.5% of the prediction were good 
@@ -311,14 +370,15 @@ penguin_test <- penguin_test %>% select(-c(flipper_length_mm, sex))
 predicted_porb <-
   m2 %>% 
   predict(penguin_test, type = "response") 
+
 predicted_sex <-
-ifelse(test = predicted_porb > 0.5, yes = "male", "female")
+ifelse(test = predicted_porb > 0.4, yes = "male", "female")
 
 penguin_test %>% 
   mutate(sex_true = class_label_test,
          sex_predicted = predicted_sex) %>% 
   mutate(good = ifelse(test = sex_true != sex_predicted, 
-                       "Good", "Bad")) %>% 
+                       "Not correct", "Correct")) %>% 
   count(good) %>% 
   
   ggplot(., aes(x="", y=n, fill=good)) +
@@ -327,8 +387,9 @@ penguin_test %>%
             position = position_stack(vjust = 0.5)) +
   coord_polar(theta = "y") +  
   theme_void() +
+  labs(fill= "The prediction is correct?") +
   theme(axis.text.x=element_blank()) + 
-  scale_fill_manual(values = c('#965F8A','#4AC6B7'))  
+  scale_fill_manual(values = c('#2c7fb8','#f03b20'))  
 ```
 
 
