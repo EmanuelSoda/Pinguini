@@ -22,18 +22,21 @@ library(plotly)
 library(factoextra)
 library(sjPlot)
 library(ggfortify)
+library(dlookr)
 theme_set(theme_light() + theme(legend.position = "bottom"))
 ```
 
-# Exploratory data aalysis
+# Exploratory data aalysis (EDA)
 ## Read data 
 First of all we will read the data. The data contains some NA values. So, we 
 will drop those NA values. After the drop of the NA values the dimension of 
-the tibble is $333 \times 8$. 
+the tibble is $333 \times 8$.
 ```{r warning=FALSE}
 penguins_df <- penguins %>% drop_na() 
-penguins_df %>%  dim()
+penguins_df %>%  glimpse()
 ```
+
+
 
 ## Number of penguin by species 
 We have  three species of penguins:
@@ -53,6 +56,34 @@ This is good because we do not have unbalanced classes.
 ```{r}
 penguins_df %>%  count(sex)
 ```
+
+## dlooker package
+A very good package for EDA is dlooker. Let's use some of its function to 
+analyze our dataset. As can be seen the percentage of missing data is not 
+drammatic. We could think of imputing them.
+
+```{r}
+plot_na_pareto(penguins, only_na = T) + 
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+```
+
+Fortunately dlooker is able also to impute the missing data using different 
+approches: 
+
+* mean
+* rpart: Recursive Paritioning and Regression Trees
+* mice: Multivariate Inputation by Chained Equations 
+
+```{r}
+penguins_impute <- penguins  %>% 
+  mutate(imputate_na(.data = penguins, 
+            xvar = bill_depth_mm, 
+            yvar = sex, method = "mean", no_attrs = T,
+            print_flag = T))
+
+penguins %>%  recipes::recipe()
+```
+
 
 ## Plot variance feature
 ```{r}
