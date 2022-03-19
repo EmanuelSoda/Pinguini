@@ -10,6 +10,8 @@ output:
   pdf_document: default
 editor_options:
   chunk_output_type: console
+  markdown: 
+    wrap: 80
 ---
 
 ```{r setup, include=FALSE}
@@ -22,19 +24,23 @@ library(plotly)
 library(factoextra)
 library(sjPlot)
 library(ggfortify)
+library(dlookr)
 theme_set(theme_light() + theme(legend.position = "bottom"))
 color_species <- c('#965F8A','#4AC6B7', "#C61951")
 color_sex <- c('#d8b365','#7fbf7b')
 ```
 
-# Exploratory data aalysis
-## Read data 
-First of all we will read the data. The data contains some NA values. So, we 
-will drop those NA values. After the drop of the NA values the dimension of 
-the tibble is $333 \times 8$. 
+# Exploratory data aalysis (EDA)
+
+## Read data
+
+First of all we will read the data. The data contains some NA values. So, we
+will drop those NA values. After the drop of the NA values the dimension of the
+tibble is $333 \times 8$.
+
 ```{r warning=FALSE}
 penguins_df <- penguins %>% drop_na() 
-penguins_df %>%  dim()
+penguins_df %>%  glimpse()
 ```
 
 ```{r}
@@ -51,27 +57,59 @@ penguins_df |>
   labs(x= NULL, y = "Percentage of species by sex")
 ```
 
+## Number of penguin by species
 
-## Number of penguin by species 
-We have  three species of penguins:
+We have three species of penguins:
 
-* __Adelie__
-* __Chinstrap__
-* __Gentoo__
+-   **Adelie**
+-   **Chinstrap**
+-   **Gentoo**
 
 As can be seen for the species we have unbalanced classes
+
 ```{r}
 penguins_df %>%  count(species)
 ```
 
-## Number of penguin by sex 
+## Number of penguin by sex
+
 As can be seen the number of male and female in the dataset is almost the same.
 This is good because we do not have unbalanced classes.
+
 ```{r}
 penguins_df %>%  count(sex)
 ```
 
+## dlooker package
+
+A very good package for EDA is dlooker. Let's use some of its function to
+analyze our dataset. As can be seen the percentage of missing data is not
+drammatic. We could think of imputing them.
+
+```{r}
+plot_na_pareto(penguins, only_na = T) + 
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+```
+
+Fortunately dlooker is able also to impute the missing data using different
+approches:
+
+-   mean
+-   rpart: Recursive Paritioning and Regression Trees
+-   mice: Multivariate Inputation by Chained Equations
+
+```{r}
+penguins_impute <- penguins  %>% 
+  mutate(imputate_na(.data = penguins, 
+            xvar = bill_depth_mm, 
+            yvar = sex, method = "mean", no_attrs = T,
+            print_flag = T))
+
+penguins %>%  recipes::recipe()
+```
+
 ## Plot variance feature
+
 ```{r}
 my_comparisons <- list(c("female", "male"))
 penguins_df  %>% 
@@ -115,14 +153,16 @@ ggstatsplot::ggcorrmat(
 ```
 
 ## Plot in a 3D space using the predictor
+
 Let's make a scatterplot using three predictors which are:
 
-* __bill_length_mm__
-* __bill_depth_mm__
-* __flipper_length_mm__
+-   **bill_length_mm**
+-   **bill_depth_mm**
+-   **flipper_length_mm**
 
-The size of the dot will be scaled by __body_mass_g__ and we will color the 
-dots by sex
+The size of the dot will be scaled by **body_mass_g** and we will color the dots
+by sex
+
 ```{r}
 plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
         z = ~flipper_length_mm, size = ~body_mass_g,
@@ -132,7 +172,8 @@ plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm,
         color = ~sex, colors = color_sex)
 ```
 
-Let's do the same for the __species__
+Let's do the same for the **species**
+
 ```{r}
 plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm, 
         z = ~flipper_length_mm, size = ~body_mass_g,
@@ -166,9 +207,11 @@ fviz_pca_var(pca_res,
 ```
 
 ## Percentage variance Expressed by PCs
-First of all we will have a look to the percentage of expressed variance by each 
-of the PC. As can be seen the cumulativepercentage of expressed variance by 
-the first two is about $80\%$.
+
+First of all we will have a look to the percentage of expressed variance by each
+of the PC. As can be seen the cumulativepercentage of expressed variance by the
+first two is about $80\%$.
+
 ```{r}
 fviz_eig(pca_res, barcolor = "black", 
          main = NULL, ylab = "Percentage explained variance") +
@@ -193,32 +236,33 @@ pca_res <-
 ```
 
 ## PCA plot by sex
+
 ```{r}
 plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
         color = ~sex, colors = color_sex)
 ```
 
 ## PCA plot by species
+
 ```{r}
 plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
         color = ~species, colors = color_species)
 ```
 
-
-
-
-
 # Creation of the model to predict the sex
-As we have seen from the plot the data cluster very well according to the three 
-species, this because of course the three species are based on those measurements.
-For this reason we will try to predict the sex based on those measurements. 
+
+As we have seen from the plot the data cluster very well according to the three
+species, this because of course the three species are based on those
+measurements. For this reason we will try to predict the sex based on those
+measurements.
 
 First of all we have to create the training dataset that we will call
-__penguin_train__. Unfortunately the entire dataset has only 333 sample. Those
-are not a lot for those reason order to improve the performance we will use 
-the resampling.
+**penguin_train**. Unfortunately the entire dataset has only 333 sample. Those
+are not a lot for those reason order to improve the performance we will use the
+resampling.
 
 The dimension of the training is 249 and for the test we have 84.
+
 ```{r}
 penguins_df <- penguins_df %>% select(- c(year, island, species))
 # Creation of a split stratified by sex in order to have the same number 
@@ -229,9 +273,10 @@ penguin_train <- training(penguin_split)
 penguin_test <- testing(penguin_split)
 ```
 
-# Creating the model 
-We will use two very simple model __logistic regression__ and a more complex
-but less interpretable model __random forest__
+# Creating the model
+
+We will use two very simple model **logistic regression** and a more complex but
+less interpretable model **random forest**
 
 ```{r}
 glm_spec <- logistic_reg() %>%
@@ -251,12 +296,14 @@ penguin_wf <- workflow() %>%
 # Fit the model
 
 ## Creting the resampling dataset
+
 ```{r}
 folds <- vfold_cv(data = penguin_train, v = 10, repeats = 10, strata = sex)
 folds
 ```
 
 ## Fitting the model
+
 ```{r}
 doParallel::registerDoParallel() 
 
@@ -277,12 +324,13 @@ pengun_random_forest <-
     control = control_resamples(save_pred = T))
 ```
 
-# Metrics 
-## Accuracy and AUC 
-As can be seen even if the __Random Forest_ is more complex  model as can 
-be seen the __Logistic Regression__ have similar performance. 
-For this reason we will use the __Logistic Regression__ because is a lot simpler
-to interpret.
+# Metrics
+
+## Accuracy and AUC
+
+As can be seen even if the \_\_Random Forest\_ is more complex model as can be
+seen the **Logistic Regression** have similar performance. For this reason we
+will use the **Logistic Regression** because is a lot simpler to interpret.
 
 ```{r}
 collect_metrics(pengun_logistic)
@@ -291,7 +339,9 @@ collect_metrics(pengun_random_forest)
 ```
 
 # ROC curve
-As can be see the ROC Curve for each resample is quite good 
+
+As can be see the ROC Curve for each resample is quite good
+
 ```{r}
 pengun_logistic %>%
   collect_predictions() %>%
@@ -308,6 +358,7 @@ pengun_logistic %>%
 ## Confusion Matrix
 
 And also the Confusion matrix is quite good
+
 ```{r}
 penguin_final <- penguin_wf %>%
   add_model(glm_spec) %>%
@@ -318,11 +369,12 @@ collect_predictions(penguin_final) %>%
   autoplot(type = "heatmap") 
 ```
 
+# Interpretation
 
-# Interpretation 
-The use of a  __logistic regression__ is good because is a very simple  and so
-very interpretable model. In particular there is a property for which the 
-if the exponentiate parameter of the model corresponds to the odds ration 
+The use of a **logistic regression** is good because is a very simple and so
+very interpretable model. In particular there is a property for which the if the
+exponentiate parameter of the model corresponds to the odds ration
+
 ```{r}
 penguin_final$.workflow[[1]] %>%
   tidy(exponentiate = TRUE)  %>% 
@@ -330,9 +382,10 @@ penguin_final$.workflow[[1]] %>%
   mutate(estimate = round(estimate, 5))
 ```
 
-For this reason  we can say that for each $1$ mm increment in the 
-__bill_depth_mm__the odds of beeing male vs beeing female increase of $7.23$ 
+For this reason we can say that for each $1$ mm increment in the
+\_\_bill_depth_mm\_\_the odds of beeing male vs beeing female increase of $7.23$
 time.
+
 ```{r}
 m1 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 
@@ -343,18 +396,15 @@ summary(m1)
 plot_model(m1, sort.est = TRUE,show.values = T)
 ```
 
-
 Last we plot the model parameter for the predictor
+
 ```{r}
 ggstatsplot::ggcoefstats(m1, ggtheme = theme_light())
 ```
 
-
-As can be seen the __flipper_length_mm__  and the __bill_length_mm_ are not
-statistically significant. We can remove those predictors and train again
-the model. 
-
-
+As can be seen the **flipper_length_mm** and the \_\_bill_length_mm\_ are not
+statistically significant. We can remove those predictors and train again the
+model.
 
 ```{r}
 penguin_train <- 
@@ -365,12 +415,11 @@ m2 <- stats::glm(formula = sex ~., family =  stats::binomial, penguin_train)
 summary(m2)
 ```
 
+Looking at the final model we can say that for each $1$ mm increment in the
+**bill_depth_mm** the odds of beeing male vs beeing female increase of $7.45$
+time. While for each $1$ g increment in the **bill_depth_mm** the odds of beeing
+male vs beeing female increase of $1.01$ times.
 
-
-Looking at the final model we can say that for each $1$ mm increment in the 
-__bill_depth_mm__ the odds of beeing male vs beeing female increase of $7.45$ 
-time. While for each $1$ g increment in the __bill_depth_mm__ the odds of beeing 
-male vs beeing female increase of $1.01$ times. 
 ```{r}
 plot_model(m2, sort.est = TRUE, show.values = T)
 ```
@@ -379,8 +428,8 @@ plot_model(m2, sort.est = TRUE, show.values = T)
 ggstatsplot::ggcoefstats(m2, ggtheme = theme_light())
 ```
 
+As can be seen from the pie chart almost 90.5% of the prediction were good
 
-As can be seen from the pie chart almost 90.5% of the prediction were good 
 ```{r}
 class_label_test <-  penguin_test %>% pull(sex)
 penguin_test <- penguin_test %>% select(-c(flipper_length_mm, sex))
@@ -408,8 +457,3 @@ penguin_test %>%
   theme(axis.text.x=element_blank()) + 
   scale_fill_manual(values = c('#2c7fb8','#f03b20'))  
 ```
-
-
-
-
-
