@@ -23,6 +23,8 @@ library(factoextra)
 library(sjPlot)
 library(ggfortify)
 theme_set(theme_light() + theme(legend.position = "bottom"))
+color_species <- c('#965F8A','#4AC6B7', "#C61951")
+color_sex <- c('#d8b365','#7fbf7b')
 ```
 
 # Exploratory data aalysis
@@ -34,6 +36,21 @@ the tibble is $333 \times 8$.
 penguins_df <- penguins %>% drop_na() 
 penguins_df %>%  dim()
 ```
+
+```{r}
+penguins_df |> 
+  count(species, sex) |> 
+  mutate(perc = round(n /sum(n) * 100, 2)) |> 
+  mutate(per = paste(perc, "%")) |> 
+  ggplot(aes(sex, perc, fill = species,
+             label = per)) +
+  geom_col(position = 'fill') +
+  geom_label(position = position_fill(vjust=0.5), size = 5)  +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = color_species)  +
+  labs(x= NULL, y = "Percentage of species by sex")
+```
+
 
 ## Number of penguin by species 
 We have  three species of penguins:
@@ -64,11 +81,11 @@ penguins_df  %>%
   
   ggplot(., aes(sex, value, fill = sex, color = species)) +
   geom_violin(width=0.7, color = "black", alpha = 0.3) +
-  geom_jitter(width=0.25, aplha = 0.8) +
+  geom_jitter(width=0.25, alpha = 0.8) +
   geom_boxplot(width= 0.09, fill = "white", color = "black", alpha = 0.3) +
   scale_y_log10() +
-  scale_fill_manual(values = c('#d8b365','#7fbf7b')) + 
-  scale_color_manual(values = c('#965F8A','#4AC6B7', "#C61951")) +
+  scale_fill_manual(values = color_sex) + 
+  scale_color_manual(values = color_species) +
   labs(col = "Species", fill = "Sex", size = "Size", x = NULL, y = NULL) +
   ggpubr::stat_compare_means(comparisons = my_comparisons, 
                              label = "p.signif") +
@@ -85,7 +102,7 @@ penguins_df  %>%
   ggplot(., aes(value, fill = sex)) +
   geom_density(alpha= 0.3) +
   labs(fill = "Sex", x = NULL) +
-  scale_fill_manual(values = c('#d8b365','#7fbf7b'))  +
+  scale_fill_manual(values = color_sex)  +
   facet_wrap("name", scales = "free") 
 ```
 
@@ -112,7 +129,7 @@ plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm,
         marker = list(symbol = 'circle', 
                       sizemode = 'diameter'), 
         sizes = c(1, 20),
-        color = ~sex, colors = c('#d8b365','#7fbf7b'))
+        color = ~sex, colors = color_sex)
 ```
 
 Let's do the same for the __species__
@@ -122,7 +139,7 @@ plot_ly(penguins_df, x = ~bill_length_mm, y = ~bill_depth_mm,
         marker = list(symbol = 'circle', 
                       sizemode = 'diameter'), 
         sizes = c(1, 20),
-        color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
+        color = ~species, colors = color_species)
 
 penguins_df %>% 
 ggplot(., aes(x = bill_length_mm, y = bill_depth_mm, 
@@ -178,13 +195,13 @@ pca_res <-
 ## PCA plot by sex
 ```{r}
 plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
-        color = ~sex, colors = c('#d8b365','#7fbf7b'))
+        color = ~sex, colors = color_sex)
 ```
 
 ## PCA plot by species
 ```{r}
 plot_ly(pca_res, x = ~PC1, y = ~PC2, z = ~PC3,
-        color = ~species, colors = c('#965F8A','#4AC6B7', "#C61951"))
+        color = ~species, colors = color_species)
 ```
 
 
