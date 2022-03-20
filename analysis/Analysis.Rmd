@@ -331,7 +331,7 @@ penguin_wf <- workflow() %>%
 ## Creting the resampling dataset
 
 ```{r}
-folds <- vfold_cv(data = penguin_train, v = 100, 
+folds <- vfold_cv(data = penguin_train, v = 10, 
                   repeats = 100, strata = sex)
 folds
 ```
